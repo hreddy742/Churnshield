@@ -1,0 +1,67 @@
+[
+  {
+    "feature": "tenure_months",
+    "importance": 0.424,
+    "display_name": "Tenure Months"
+  },
+  {
+    "feature": "contract_type_Month-to-Month",
+    "importance": 0.4223,
+    "display_name": "Contract Type Month-To-Month"
+  },
+  {
+    "feature": "num_support_tickets",
+    "importance": 0.3108,
+    "display_name": "Num Support Tickets"
+  },
+  {
+    "feature": "monthly_charges",
+    "importance": 0.2592,
+    "display_name": "Monthly Charges"
+  },
+  {
+    "feature": "avg_satisfaction_score",
+    "importance": 0.2567,
+    "display_name": "Avg Satisfaction Score"
+  },
+  {
+    "feature": "contract_type_Two Year",
+    "importance": 0.0903,
+    "display_name": "Contract Type Two Year"
+  },
+  {
+    "feature": "num_products",
+    "importance": 0.0626,
+    "display_name": "Num Products"
+  },
+  {
+    "feature": "sentiment_score",
+    "importance": 0.0207,
+    "display_name": "Sentiment Score"
+  },
+  {
+    "feature": "contract_type_One Year",
+    "importance": 0.0189,
+    "display_name": "Contract Type One Year"
+  },
+  {
+    "feature": "payment_method_Electronic",
+    "importance": 0.0078,
+    "display_name": "Payment Method Electronic"
+  },
+  {
+    "feature": "payment_method_Credit Card",
+    "importance": 0.0055,
+    "display_name": "Payment Method Credit Card"
+  },
+  {
+    "feature": "payment_method_Bank Transfer",
+    "importance": 0.0053,
+    "display_name": "Payment Method Bank Transfer"
+  },
+  {
+    "feature": "payment_method_Mailed Check",
+    "importance": 0.0045,
+    "display_name": "Payment Method Mailed Check"
+  }
+]

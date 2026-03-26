@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+
+# ML artifacts (committed after training)
+# ml/models/*.pkl  — DO commit these
+mlruns/
+*.log
+
+# Node
+node_modules/
+frontend/dist/
+frontend/.env
+
+# Environment
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/

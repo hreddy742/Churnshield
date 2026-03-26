@@ -1,0 +1,31 @@
+{
+  "numeric": [
+    "tenure_months",
+    "monthly_charges",
+    "num_support_tickets",
+    "avg_satisfaction_score",
+    "num_products"
+  ],
+  "categorical": [
+    "contract_type",
+    "payment_method"
+  ],
+  "text": [
+    "customer_notes"
+  ],
+  "all_features": [
+    "tenure_months",
+    "monthly_charges",
+    "num_support_tickets",
+    "avg_satisfaction_score",
+    "num_products",
+    "sentiment_score",
+    "contract_type_Month-to-Month",
+    "contract_type_One Year",
+    "contract_type_Two Year",
+    "payment_method_Bank Transfer",
+    "payment_method_Credit Card",
+    "payment_method_Electronic",
+    "payment_method_Mailed Check"
+  ]
+}

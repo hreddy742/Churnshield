@@ -1,0 +1,12 @@
+{
+  "logistic_regression_val_auc": 0.751,
+  "xgboost_val_auc": 0.7445,
+  "lightgbm_val_auc": 0.7465,
+  "ensemble_test_auc": 0.7757,
+  "ensemble_test_f1": 0.3921,
+  "ensemble_test_pr_auc": 0.5675,
+  "training_samples": 35000,
+  "test_samples": 7500,
+  "churn_rate": 0.2735,
+  "trained_at": "2026-03-26T02:16:54.647530+00:00"
+}
