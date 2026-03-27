@@ -1,0 +1,9 @@
+feature,mean_abs_shap
+avg_satisfaction_score,0.29520256023443
+monthly_charges,0.23585784043379424
+contract_type_month-to-month,0.2200709084449984
+num_support_tickets,0.1927435848939689
+note_sentiment_score,0.1845700389565952
+tenure_months,0.13955325030551538
+contract_type_one-year,0.08806584304577315
+contract_type_two-year,0.08569590536602902
