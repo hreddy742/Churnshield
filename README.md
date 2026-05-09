@@ -1,225 +1,416 @@
-# ChurnShield — Customer Churn Prediction Platform
+# ChurnShield
 
-> Predict which customers will churn and why. Real-time predictions with
-> SHAP explainability, drift monitoring, and batch scoring. 100% open source.
+ChurnShield is an end-to-end customer churn prediction platform for retention teams and ML engineers. It combines a FastAPI inference service, a React dashboard, and a reproducible ML pipeline that trains gradient-boosted churn models, explains predictions with SHAP, and monitors input drift.
 
-[![Live Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://churnshield.vercel.app)
-[![Open Source](https://img.shields.io/badge/open_source-100%25-green)]()
-[![License MIT](https://img.shields.io/badge/license-MIT-blue)]()
+The project is designed to demonstrate a production-style churn workflow: generate or ingest customer data, train and evaluate models, serve low-latency predictions, explain the top risk factors, score CSV batches, and expose model health metrics to an operator-facing UI.
 
-**Live demo:** https://churnshield.vercel.app | **API docs:** https://churnshield-api.railway.app/docs
+## Features
 
----
+- Real-time churn prediction from a customer profile.
+- Risk tiering with low, medium, and high churn bands.
+- SHAP-based prediction explanations with top contributing factors.
+- Batch CSV scoring for up to 1,000 customers per upload.
+- Downloadable CSV template for batch scoring.
+- Model performance dashboard with ROC curves, experiment comparison, and feature importance.
+- Drift monitoring using PSI for numeric features and chi-squared tests for categorical features.
+- Synthetic customer data generation for local experimentation.
+- Reproducible training pipeline with Logistic Regression, XGBoost, LightGBM, and an XGBoost plus LightGBM ensemble.
+- Docker, Railway, and Vercel-friendly deployment configuration.
 
-## The problem
+## Tech Stack
 
-Telecom and SaaS companies lose significant revenue to customer churn.
-Identifying which customers are at risk allows retention teams to
-intervene before cancellation. However, two problems prevent adoption:
+| Layer | Technology |
+| --- | --- |
+| Frontend | React 18, TypeScript, Vite, Tailwind CSS, Recharts, Axios, lucide-react |
+| Backend API | FastAPI, Uvicorn, Pydantic |
+| Machine learning | scikit-learn, XGBoost, LightGBM, SHAP, MLflow, joblib |
+| NLP feature extraction | Hugging Face Transformers, DistilBERT sentiment model, PyTorch |
+| Data and monitoring | pandas, NumPy, SciPy, Faker |
+| Database | PostgreSQL service configured for deployment/local compose; no persistence layer is currently implemented |
+| Deployment | Docker, Docker Compose, Railway, Vercel-compatible frontend build |
 
-1. **Black box predictions** — teams don't trust a score they can't explain
-2. **Model drift** — predictions degrade as customer behavior changes
+## Architecture
 
-ChurnShield addresses both: every prediction includes a SHAP explanation
-showing exactly which factors drove the score, and a drift monitor tracks
-when the model's input distribution shifts.
+```text
+React dashboard
+    |
+    | HTTP/JSON and CSV upload
+    v
+FastAPI service
+    |
+    | loads model artifacts from ml/models
+    v
+Preprocessor + DistilBERT sentiment feature + XGBoost/LightGBM ensemble
+    |
+    | prediction, SHAP explanation, metrics, drift report
+    v
+API response / downloadable CSV
+```
 
----
+The API loads `ml/models/ensemble.pkl`, extracts a sentiment score from `customer_notes`, transforms numeric and categorical features with the saved preprocessor, averages XGBoost and LightGBM probabilities, and returns the churn probability plus a SHAP explanation from the XGBoost model.
 
-## What ChurnShield does
+Model monitoring is currently file-based. The drift endpoint compares a reference sample from `ml/data/raw/customer_data.csv` with a simulated recent prediction sample. PostgreSQL is configured in Docker and environment files, but the current codebase does not yet persist predictions or run database migrations.
 
-**Single prediction:** Enter a customer's profile and get a churn
-probability in milliseconds with a SHAP waterfall chart explaining the top 5 factors.
+## Project Structure
 
-**Batch scoring:** Upload a CSV of customers and download predictions
-for your entire book of business.
+```text
+.
+|-- backend/
+|   |-- api/
+|   |   |-- main.py              # FastAPI app, CORS, router registration
+|   |   |-- schemas.py           # Pydantic request/response models
+|   |   `-- routes/
+|   |       |-- health.py        # Health and artifact checks
+|   |       |-- predict.py       # Single-customer prediction endpoint
+|   |       |-- batch.py         # CSV template and batch scoring endpoints
+|   |       |-- explain.py       # SHAP explanation endpoint
+|   |       `-- monitor.py       # Metrics and drift endpoints
+|   |-- core/config.py           # Pydantic settings
+|   |-- Dockerfile               # Production API image
+|   `-- requirements.txt         # Python dependencies
+|-- frontend/
+|   |-- src/
+|   |   |-- api/client.ts        # Axios API client
+|   |   |-- components/          # Forms, charts, gauge, upload UI
+|   |   |-- pages/               # Predict, Model, Monitor pages
+|   |   `-- types/               # Shared TypeScript interfaces
+|   |-- package.json             # Frontend scripts and dependencies
+|   `-- vite.config.ts           # Vite dev server and proxy config
+|-- ml/
+|   |-- data/generate.py         # Synthetic customer data generator
+|   |-- data/raw/                # Generated reference data
+|   |-- pipelines/
+|   |   |-- features.py          # Preprocessing and sentiment features
+|   |   |-- train.py             # Model training and artifact export
+|   |   `-- evaluate.py          # SHAP feature importance export
+|   |-- monitoring/drift.py      # Drift detection utilities
+|   `-- models/                  # Serialized models and metric artifacts
+|-- docker-compose.yml           # Local Postgres, API, and frontend services
+|-- railway.json                 # Railway API deployment config
+|-- Procfile                     # Process start command for platform deploys
+|-- runtime.txt                  # Python runtime hint
+`-- .env.example                 # Example environment variables
+```
 
-**Model performance:** View ROC curves, feature importance, and
-experiment comparison across all trained models.
+## Model Artifacts
 
-**Drift monitoring:** Track Population Stability Index (PSI) for all
-features to detect when incoming data deviates from training distribution.
+The repository includes trained model artifacts under `ml/models/`:
 
----
+| Artifact | Purpose |
+| --- | --- |
+| `ensemble.pkl` | Production inference bundle with XGBoost, LightGBM, preprocessor, feature names, and threshold |
+| `xgb_model.pkl` | Trained XGBoost model |
+| `lgb_model.pkl` | Trained LightGBM model |
+| `preprocessor.pkl` | scikit-learn preprocessing pipeline |
+| `training_report.json` | AUC, F1, PR AUC, sample counts, churn rate, and training timestamp |
+| `roc_curve.json` | ROC curve points for frontend charts |
+| `feature_importance.json` | Mean absolute SHAP feature importances |
+| `feature_columns.json` | Numeric, categorical, text, and encoded feature metadata |
 
-## How it works — technical deep dive
-
-### Machine learning pipeline
-
-ChurnShield trains three models and combines XGBoost and LightGBM
-into a soft-voting ensemble:
-
-**1. Data generation**
-50,000 synthetic customer records with realistic distributions:
-- Tenure: gamma distribution (shape=2.2, scale=12 months)
-- Churn label: logistic function of tenure, charges, satisfaction,
-  contract type, support tickets, and product count
-- Target churn rate: ~27% (realistic for telecom)
-
-**2. Feature engineering**
-Standard features (tenure, charges, satisfaction) are combined with
-a sentiment score extracted from customer notes using
-`distilbert-base-uncased-finetuned-sst-2-english`. This model runs
-locally on CPU — no API call. It converts free-text notes into a
-0.0–1.0 sentiment score that serves as an additional predictive feature.
-
-**3. Model training**
-Three models are trained and tracked in MLflow:
-
-| Model | Val AUC | Notes |
-|-------|---------|-------|
-| Logistic Regression | 0.751 | Baseline |
-| XGBoost | 0.745 | Tree boosting, early stopping |
-| LightGBM | 0.747 | Gradient boosting, early stopping |
-| **Ensemble (XGB+LGB avg)** | **0.776** | **Production model (test set)** |
-
-The ensemble improves AUC by +3.3% over the logistic regression baseline.
-The synthetic notes use only 20 fixed templates, so the sentiment feature
-adds limited signal here — real customer notes would push AUC higher.
-
-**4. SHAP explainability**
-After training, SHAP (SHapley Additive exPlanations) values are
-computed using `shap.TreeExplainer`. For every prediction:
-- Base value: average model output across training data
-- SHAP values: each feature's contribution to pushing the
-  prediction above or below the base value
-- Positive SHAP: feature increases churn probability
-- Negative SHAP: feature decreases churn probability
-
-The waterfall chart shows these values sorted by magnitude,
-so users immediately see which factors matter most.
-
-Top predictors (mean |SHAP value|):
-1. Tenure months — 0.424
-2. Contract type: Month-to-Month — 0.422
-3. Support tickets — 0.311
-4. Monthly charges — 0.259
-5. Satisfaction score — 0.257
-
-**5. Drift detection**
-Population Stability Index (PSI) measures how much a feature's
-distribution has shifted compared to training:
-- PSI < 0.1: stable
-- PSI 0.1–0.2: moderate shift, monitor
-- PSI > 0.2: significant shift, consider retraining
-
----
-
-## Performance
+Current checked-in training metrics:
 
 | Metric | Value |
-|--------|-------|
-| Ensemble test AUC | 0.776 |
-| Baseline (logistic) AUC | 0.751 |
-| AUC improvement over baseline | +3.3% |
-| Ensemble test F1 | 0.392 |
-| Training churn rate | 27.3% |
-| Training data | 50,000 records |
-| Features | 6 numeric + 2 categorical + 1 text-derived |
-| Single prediction latency | < 50ms |
-| Batch (1,000 customers) | < 5 seconds |
+| --- | ---: |
+| Ensemble test AUC | 0.7757 |
+| Ensemble test F1 | 0.3921 |
+| Ensemble test PR AUC | 0.5675 |
+| Logistic Regression validation AUC | 0.7510 |
+| XGBoost validation AUC | 0.7445 |
+| LightGBM validation AUC | 0.7465 |
+| Training samples | 35,000 |
+| Test samples | 7,500 |
+| Training churn rate | 27.35% |
 
----
+## Prerequisites
 
-## Open source components
+- Python 3.11
+- Node.js 20 or newer
+- npm
+- Docker and Docker Compose, optional but recommended for production-like local runs
 
-| Component | Technology | License | Cost |
-|-----------|-----------|---------|------|
-| Gradient boosting | XGBoost | Apache 2.0 | Free |
-| Gradient boosting | LightGBM | MIT | Free |
-| Explainability | SHAP | MIT | Free |
-| Feature engineering | scikit-learn | BSD | Free |
-| Text sentiment | distilbert (local) | Apache 2.0 | Free |
-| Experiment tracking | MLflow | Apache 2.0 | Free |
-| Backend | FastAPI | MIT | Free |
-| Frontend | React + Tailwind | MIT | Free |
-| Hosting | Railway + Vercel | — | Free tier |
+The backend should be run from the repository root so imports and relative artifact paths resolve correctly.
 
-No LLM API. No cloud AI services. Everything runs locally.
+## Environment Variables
 
----
-
-## Technical decisions
-
-**Why an ensemble instead of a single model?**
-XGBoost and LightGBM use different optimization strategies
-(Newton boosting vs gradient boosting with leaf-wise growth).
-Averaging their probability outputs reduces variance and consistently
-improves AUC over either model alone with no added complexity.
-
-**Why SHAP TreeExplainer instead of feature importance from the model?**
-Built-in feature importance (gain, coverage, frequency) measures
-how often or how much a feature is used during training, not its
-effect on individual predictions. SHAP values are game-theoretically
-grounded: they measure each feature's actual contribution to a
-specific prediction, making them useful for both global analysis
-and individual explanation.
-
-**Why local distilbert instead of a sentiment API?**
-The model (67MB) downloads once and runs on CPU in ~20ms per batch.
-Using a sentiment API would add network latency, cost, and a privacy
-concern (sending customer notes to a third party). Local inference
-is faster, cheaper, and keeps data internal.
-
-**Why PSI for drift detection?**
-PSI is the industry standard for model monitoring in banking and
-insurance. It is interpretable (a number with defined thresholds),
-computationally cheap (histogram comparison), and does not require
-labels (unlike accuracy-based drift detection that needs ground truth).
-
----
-
-## Quick start
+Copy the example file for backend/local deployment settings:
 
 ```bash
-git clone https://github.com/harshavardhan/churnshield
-cd churnshield
-
-# Generate training data
-python ml/data/generate.py
-
-# Train models (takes 5-10 min on first run — downloads distilbert once)
-PYTHONPATH=. python ml/pipelines/train.py
-
-# Compute SHAP feature importance
-PYTHONPATH=. python ml/pipelines/evaluate.py
-
-# Start API and frontend
 cp .env.example .env
-docker compose up
-
-open http://localhost:3000
 ```
 
----
+| Variable | Used by | Default/example | Description |
+| --- | --- | --- | --- |
+| `DATABASE_URL` | Backend config, Docker/Railway environments | `postgresql://churnshield:churnshield@localhost:5432/churnshield` | PostgreSQL connection string. Configured but not actively used by the current API routes. |
+| `DEBUG` | Backend config | `false` | Enables debug-style settings if wired into future backend code. |
+| `VITE_API_URL` | Frontend | `http://localhost:8000` | Base URL for API requests from the React app. In local frontend development, place this in `frontend/.env.local`. |
+| `PORT` | Railway/Procfile deployments | platform-provided | Runtime port used by hosted API start commands. |
 
-## Reproducing the training results
+For local frontend development, create a Vite env file:
 
 ```bash
-# 1. Generate 50,000 customer records
+printf "VITE_API_URL=http://localhost:8000\n" > frontend/.env.local
+```
+
+## Installation
+
+### 1. Clone and create a Python environment
+
+```bash
+git clone <repository-url>
+cd <repository-directory>
+
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r backend/requirements.txt
+```
+
+### 2. Install frontend dependencies
+
+```bash
+cd frontend
+npm install
+cd ..
+```
+
+### 3. Prepare model artifacts, if needed
+
+Trained artifacts are already present in `ml/models/`. To regenerate them:
+
+```bash
 python ml/data/generate.py
-# Output: ml/data/raw/customer_data.csv (churn rate ~27%)
-
-# 2. Train all models
 PYTHONPATH=. python ml/pipelines/train.py
-# Output: ml/models/ (ensemble.pkl, xgb_model.pkl, training_report.json, ...)
-# View experiments: mlflow ui --port 5001
-
-# 3. Compute SHAP feature importance
 PYTHONPATH=. python ml/pipelines/evaluate.py
-# Output: ml/models/feature_importance.json
 ```
 
-Expected output:
-```
-LogReg val AUC: 0.7510
-XGBoost val AUC: 0.7445
-LightGBM val AUC: 0.7465
-Ensemble test AUC: 0.7757
-Ensemble test F1: 0.3921
+The first run downloads the DistilBERT sentiment model used to convert `customer_notes` into a numeric feature.
+
+## Running Locally
+
+### Start the API
+
+```bash
+source .venv/bin/activate
+uvicorn backend.api.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
----
+API URLs:
 
-Built by [Harsha Vardhan Reddy](https://linkedin.com/in/hvreddy)
-AI/ML Engineer · Birmingham, AL
+- API root: `http://localhost:8000/`
+- Health check: `http://localhost:8000/health/`
+- OpenAPI docs: `http://localhost:8000/docs`
+
+### Start the frontend
+
+```bash
+cd frontend
+printf "VITE_API_URL=http://localhost:8000\n" > .env.local
+npm run dev
+```
+
+The Vite config uses port `3002`, so the local app runs at:
+
+```text
+http://localhost:3002
+```
+
+### Run with Docker Compose
+
+```bash
+docker compose up --build
+```
+
+Compose starts:
+
+- PostgreSQL on `localhost:5432`
+- API on `localhost:8000`
+- Frontend service from the `frontend/` directory
+
+Note: `frontend/vite.config.ts` currently sets the dev server port to `3002`, while `docker-compose.yml` maps `3000:3000`. If the frontend container is unreachable, either run the frontend locally with `npm run dev`, change the compose mapping to `3002:3002`, or override the Vite command to use port `3000`.
+
+## API Reference
+
+All examples assume the API is running on `http://localhost:8000`.
+
+### Root
+
+```http
+GET /
+```
+
+Returns API metadata and the docs path.
+
+### Health
+
+```http
+GET /health/
+```
+
+Checks whether required model artifacts are present.
+
+### Predict churn
+
+```http
+POST /predict/
+Content-Type: application/json
+```
+
+Request:
+
+```json
+{
+  "tenure_months": 12,
+  "monthly_charges": 75.5,
+  "contract_type": "Month-to-Month",
+  "num_support_tickets": 3,
+  "avg_satisfaction_score": 3.2,
+  "payment_method": "Electronic",
+  "num_products": 2,
+  "customer_notes": "Mentioned cancellation on support call"
+}
+```
+
+Example:
+
+```bash
+curl -X POST http://localhost:8000/predict/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tenure_months": 12,
+    "monthly_charges": 75.5,
+    "contract_type": "Month-to-Month",
+    "num_support_tickets": 3,
+    "avg_satisfaction_score": 3.2,
+    "payment_method": "Electronic",
+    "num_products": 2,
+    "customer_notes": "Mentioned cancellation on support call"
+  }'
+```
+
+Response shape:
+
+```json
+{
+  "churn_probability": 0.6321,
+  "risk_tier": "high",
+  "top_factors": [
+    {
+      "feature": "contract_type_Month-to-Month",
+      "display_name": "Contract: Month-To-Month",
+      "shap_value": 0.4223,
+      "direction": "increases_risk"
+    }
+  ],
+  "shap_base_value": -1.0245,
+  "inference_ms": 42
+}
+```
+
+### Explain prediction with SHAP
+
+```http
+POST /explain/shap
+Content-Type: application/json
+```
+
+Accepts the same request body as `/predict/` and returns the SHAP base value plus feature-level SHAP values.
+
+### Download batch template
+
+```http
+GET /batch/template
+```
+
+```bash
+curl -L http://localhost:8000/batch/template -o churnshield_template.csv
+```
+
+Required CSV columns:
+
+```text
+tenure_months,monthly_charges,contract_type,num_support_tickets,avg_satisfaction_score,payment_method,num_products,customer_notes
+```
+
+### Upload batch CSV
+
+```http
+POST /batch/upload
+Content-Type: multipart/form-data
+```
+
+```bash
+curl -X POST http://localhost:8000/batch/upload \
+  -F "file=@customers.csv" \
+  -o churn_predictions.csv
+```
+
+The uploaded file must be a CSV with the required columns and at most 1,000 rows. The response is a CSV containing the original fields plus `churn_probability` and `risk_tier`.
+
+### Get model metrics
+
+```http
+GET /monitor/metrics
+```
+
+Returns `training_report`, `roc_curve`, and `feature_importance` from `ml/models/`.
+
+### Get drift report
+
+```http
+GET /monitor/drift
+```
+
+Returns per-feature drift scores and an overall status:
+
+- `stable`
+- `warning`
+- `critical`
+
+## Input Constraints
+
+The prediction schema validates customer inputs before inference.
+
+| Field | Accepted values |
+| --- | --- |
+| `tenure_months` | Integer from 1 to 84 |
+| `monthly_charges` | Float from 20 to 120 |
+| `contract_type` | `Month-to-Month`, `One Year`, `Two Year` |
+| `num_support_tickets` | Integer from 0 to 15 |
+| `avg_satisfaction_score` | Float from 1.0 to 5.0 |
+| `payment_method` | `Electronic`, `Mailed Check`, `Bank Transfer`, `Credit Card` |
+| `num_products` | Integer from 1 to 4 |
+| `customer_notes` | Optional text |
+
+## ML Workflow
+
+Generate synthetic data:
+
+```bash
+python ml/data/generate.py
+```
+
+Train models and export artifacts:
+
+```bash
+PYTHONPATH=. python ml/pipelines/train.py
+```
+
+Compute SHAP feature importance:
+
+```bash
+PYTHONPATH=. python ml/pipelines/evaluate.py
+```
+
+View MLflow runs created during training:
+
+```bash
+mlflow ui --backend-store-uri ./mlruns --port 5001
+```
+
+Training uses a 70/15/15 train/validation/test split. The production inference bundle averages XGBoost and LightGBM churn probabilities.
+
+## Database and Migrations
+
+`docker-compose.yml` provisions a PostgreSQL 16 service and `.env.example` defines `DATABASE_URL`. The current application does not include ORM models, Alembic migrations, or database-backed prediction logging. Runtime prediction, explanation, metrics, and drift behavior depend on local files under `ml/models/` and `ml/data/raw/`.
+
+If persistence is added later, create migration tooling before relying on `DATABASE_URL` in production.
